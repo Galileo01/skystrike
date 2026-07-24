@@ -41,7 +41,7 @@
 
 ## 发布与分发规划
 
-发布采用 **crates.io + GitHub Releases 双渠道**:crates.io 面向已有 Rust 工具链的用户,提供 `cargo install skystrike`;GitHub Releases 提供预编译二进制,降低普通玩家的安装门槛。`0.1.0` 已进入发布准备,正式上传前仍需完成 dry-run、安装验证与用户确认。
+发布采用 **crates.io + GitHub Releases 双渠道**:crates.io 面向已有 Rust 工具链的用户,提供 `cargo install skystrike`;GitHub Releases 后续提供预编译二进制,降低普通玩家的安装门槛。`0.1.0` 已发布到 crates.io,后续版本由 Release Please 管理版本号、CHANGELOG、tag 与 GitHub Release。
 
 ### 发布前检查
 
@@ -52,9 +52,10 @@
 5. [x] **补齐 Cargo 元数据**:`description`、MIT `license`、`repository`、`readme`、`keywords`、`categories` 与 `rust-version = 1.92`。
 6. [x] **精简 crate 内容**:用 `include` 只发布源码、双语 README、LICENSE、CHANGELOG 和项目文档,排除 `AGENTS.md`、`CLAUDE.md`。
 7. [x] **发布前演练**:`cargo publish --dry-run` 通过;生成的 20 文件 `.crate` 可独立编译并安装运行,`CHANGELOG.md` 已准备。最终确认后再创建 Git tag。
-8. [ ] **接入受控发布 workflow**:`publish-crate.yml` 已实现 `workflow_dispatch`、main/版本校验、完整 dry-run 与 `crates-io` Environment 审批;待配置 `CARGO_REGISTRY_TOKEN`、合入 main 后完成实际验证。
-9. [ ] **发布 crates.io `0.1.0`**:从 Actions 手动输入 `0.1.0`,审批后发布,再验证 `cargo install skystrike` 可直接启动游戏。
+8. [x] **接入受控发布 workflow**:`0.1.0` 已通过 main/版本校验、完整 dry-run 与 `crates-io` Environment 审批发布。
+9. [x] **发布 crates.io `0.1.0`**:`skystrike 0.1.0` 已上线,`cargo install skystrike` 可直接安装。
 10. [ ] **发布 GitHub Releases**:提供 macOS、Linux 预编译包、校验值和简短安装说明;Windows 支持完成后再增加对应产物。
+11. [ ] **验证 Release Please 首轮自动发布**:以 `0.1.0` 为基线自动维护 Release PR;合并后创建 tag/GitHub Release,经完整校验和 `crates-io` Environment 审批发布下一版本。
 
 ### 发布原则
 
@@ -119,6 +120,7 @@
 - Layer 2 开始(2026-07-10):生命值/血条(3 命 + 无敌闪烁 + 重置)、得分与连击倍数(3s 窗口,`50×combo`)。
 ## 进度记录
 
+- 2026-07-24:以 crates.io `0.1.0` 为基线接入 Release Please——main 提交自动维护 Release PR,合并后创建 tag/GitHub Release并发布下一 crate 版本;README 徽章更换缓存键,避免继续显示发布前的 `not found`。
 - 2026-07-24:新增 crates.io 受控发布 workflow——只允许手动从 main 发起,输入版本必须匹配 Cargo.toml;无权限 job 先完成全量验证/dry-run,再进入 `crates-io` Environment 人工审批并读取 Token 发布。
 - 2026-07-24:完成 `0.1.0` 发布演练——补齐 crate 元数据、MIT LICENSE、CHANGELOG 与 crates.io 徽章,明确 macOS/Linux 平台范围并增加双平台 CI;20 文件 package/dry-run/独立安装均通过。
 - 2026-07-24:Scatter 改为 10 秒限时强化——升级刷新时间,满级拾取只转 500 分且不续时,HUD 倒计时并在到期后恢复 Lv1;暂停冻结、受伤保留剩余时间。

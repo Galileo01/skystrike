@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "3fb5b2c14b502f1981315a9cf892577991f0deb9",
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "skystrike",
+      "component": "skystrike",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    }
+  },
+  "include-component-in-tag": false,
+  "tag-separator": ""
+}

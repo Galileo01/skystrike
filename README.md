@@ -4,8 +4,8 @@ A terminal-based tribute to the classic arcade shooter [**Raiden (雷电)**](htt
 
 ![screenshot](https://img.shields.io/badge/platform-terminal-black)
 ![Rust](https://img.shields.io/badge/rust-1.92+-orange)
-[![Crates.io](https://img.shields.io/crates/v/skystrike.svg)](https://crates.io/crates/skystrike)
-[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg)](https://crates.io/crates/skystrike)
+[![Crates.io](https://img.shields.io/crates/v/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
+[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 
 ## How to play
 
@@ -29,7 +29,7 @@ The renderer currently uses Unix terminal file-descriptor APIs, so Windows is
 not supported yet.
 
 ```bash
-# From crates.io after the 0.1.0 release
+# From crates.io
 cargo install skystrike
 skystrike
 

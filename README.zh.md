@@ -4,8 +4,8 @@
 
 ![平台](https://img.shields.io/badge/platform-terminal-black)
 ![Rust](https://img.shields.io/badge/rust-1.92+-orange)
-[![Crates.io](https://img.shields.io/crates/v/skystrike.svg)](https://crates.io/crates/skystrike)
-[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg)](https://crates.io/crates/skystrike)
+[![Crates.io](https://img.shields.io/crates/v/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
+[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 
 ## 操作方式
 
@@ -28,7 +28,7 @@ SkyStrike 0.1 支持 macOS 与 Linux，需要 Rust 1.92 或更高版本。当前
 依赖 Unix 终端文件描述符接口，因此暂不支持 Windows。
 
 ```bash
-# 0.1.0 发布到 crates.io 后
+# 从 crates.io 安装
 cargo install skystrike
 skystrike
 
