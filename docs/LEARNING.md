@@ -164,7 +164,8 @@ raw 模式下,普通键通常**不发送 key-up(松开)事件**。若用"按下�
 - `Cargo.toml` 用 `rust-version = "1.92"` 固定首版 MSRV,并补齐 crates.io 展示所需的 description、MIT license、repository、readme、keywords 与 categories。
 - 发布包采用 `include` 白名单,只包含编译所需源码、双语 README、LICENSE、CHANGELOG 和项目文档;`AGENTS.md`、`CLAUDE.md` 等协作文件不会进入 `.crate`。每次发布前用 `cargo package --list` 审核实际清单。
 - 当前 `renderer.rs` 使用 Unix 的 `AsRawFd`、`fcntl` 与 `O_NONBLOCK`,所以 `0.1.0` 明确支持 macOS/Linux,暂不承诺 Windows。GitHub Actions 在两个系统固定 Rust 1.92,执行格式、测试、release 构建、Clippy 与 package 验证。
-- crates.io 版本不可覆盖。流程必须是 package/dry-run → 从产物独立安装 → 用户确认 → release commit/tag → `cargo publish`;上传与 tag 不在普通功能迭代中自动执行。
+- crates.io 版本不可覆盖。普通 `ci.yml` 永远不持有发布 Token;`publish-crate.yml` 只接受 `workflow_dispatch`,先在无 Environment/Secret 的 `validate` job 校验 main、输入版本、格式、测试、release 构建、Clippy 和 dry-run。全部通过后,`publish` job 才进入受保护的 `crates-io` Environment,由人工审批并通过 `CARGO_REGISTRY_TOKEN` 执行一次 `cargo publish --locked`。
+- 并发组 `crates-io-publish` 禁止两个发布任务同时运行;workflow 输入版本必须与 `Cargo.toml` 完全一致。首次发布流程为合入 workflow → 配置 Environment/Secret → Actions 手动运行 → 审批 → crates.io 安装验证 → 创建 tag/GitHub Release。
 
 ```bash
 cargo build              # debug 构建
@@ -188,6 +189,7 @@ cargo publish --dry-run  # 只做发布演练,不上传
 - 2026-07-10:Layer 2 启动——生命值/血条(3 命 + 无敌闪烁 + 重置出生点)、得分与连击倍数(3s 窗口,`50×combo`,HUD 显示 `COMBO xN`);新增第 8 节说明计时类状态一律用帧计数而非墙钟。
 ## 修订记录
 
+- 2026-07-24:新增受控 crates.io 发布 workflow——仅手动从 main 触发,先做版本匹配与完整 dry-run,再经 `crates-io` Environment 审批读取 Token 发布;普通 CI 保持只读验证。
 - 2026-07-24:完成 `0.1.0` 发布准备演练——补齐 Cargo 元数据、MIT LICENSE、CHANGELOG、crates.io 徽章与 package 白名单,明确 macOS/Linux 边界并增加双平台 CI;dry-run 及从 `.crate` 独立安装验证通过。
 - 2026-07-24:Scatter 从整局永久升级改为 10 秒限时强化——成功升级刷新,满级拾取不续时,HUD 显示倒计时且最后 3 秒变红;暂停冻结、受伤保留,到期恢复 Lv1。
 - 2026-07-24:难度接入敌机生成密度与 X 轴航线偏置——Y 入场不变,高难按概率靠近玩家当前 X,顶部重叠时随机回退;修复 Hard/Extreme 小于 1 的间隔倍率被钳制失效。
