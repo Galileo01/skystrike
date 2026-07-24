@@ -1,5 +1,6 @@
 mod background;
 mod bullet;
+mod difficulty;
 mod game;
 mod obstacle;
 mod pickup;
@@ -10,6 +11,7 @@ mod score_store;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::style::Color;
 use crossterm::terminal::supports_keyboard_enhancement;
+use difficulty::DifficultyPreset;
 use game::{Game, GameState};
 use player::Dir;
 use rand::rng;
@@ -35,7 +37,13 @@ const REPEAT_START_MIN: Duration = Duration::from_millis(150);
 const REPEAT_START_MAX: Duration = Duration::from_millis(1000);
 const DIRECTION_REPEAT_GAP: Duration = Duration::from_millis(250);
 
-const INPUT_USAGE: &str = "Usage: skystrike [--input auto|enhanced|compatible]";
+const INPUT_USAGE: &str = "Usage: skystrike [--input auto|enhanced|compatible] [--debug]";
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct CliOptions {
+    input_mode: RequestedInputMode,
+    debug: bool,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum RequestedInputMode {
@@ -64,35 +72,43 @@ impl EffectiveInputMode {
     }
 }
 
-fn parse_input_mode<I>(args: I) -> Result<RequestedInputMode, String>
+fn parse_cli_options<I>(args: I) -> Result<CliOptions, String>
 where
     I: IntoIterator<Item = String>,
 {
     let mut args = args.into_iter();
     let _program = args.next();
-    let Some(argument) = args.next() else {
-        return Ok(RequestedInputMode::Auto);
-    };
+    let mut options = CliOptions::default();
+    let mut input_seen = false;
 
-    let value = if argument == "--input" {
-        args.next()
-            .ok_or_else(|| format!("missing value for --input\n{INPUT_USAGE}"))?
-    } else if let Some(value) = argument.strip_prefix("--input=") {
-        value.to_owned()
-    } else {
-        return Err(format!("unknown argument: {argument}\n{INPUT_USAGE}"));
-    };
+    while let Some(argument) = args.next() {
+        if argument == "--debug" {
+            options.debug = true;
+            continue;
+        }
 
-    if let Some(extra) = args.next() {
-        return Err(format!("unexpected argument: {extra}\n{INPUT_USAGE}"));
+        let value = if argument == "--input" {
+            args.next()
+                .ok_or_else(|| format!("missing value for --input\n{INPUT_USAGE}"))?
+        } else if let Some(value) = argument.strip_prefix("--input=") {
+            value.to_owned()
+        } else {
+            return Err(format!("unknown argument: {argument}\n{INPUT_USAGE}"));
+        };
+
+        if input_seen {
+            return Err(format!("duplicate --input argument\n{INPUT_USAGE}"));
+        }
+        input_seen = true;
+        options.input_mode = match value.as_str() {
+            "auto" => RequestedInputMode::Auto,
+            "enhanced" => RequestedInputMode::Enhanced,
+            "compatible" => RequestedInputMode::Compatible,
+            _ => return Err(format!("invalid input mode: {value}\n{INPUT_USAGE}")),
+        };
     }
 
-    match value.as_str() {
-        "auto" => Ok(RequestedInputMode::Auto),
-        "enhanced" => Ok(RequestedInputMode::Enhanced),
-        "compatible" => Ok(RequestedInputMode::Compatible),
-        _ => Err(format!("invalid input mode: {value}\n{INPUT_USAGE}")),
-    }
+    Ok(options)
 }
 
 fn resolve_input_mode(requested: RequestedInputMode) -> EffectiveInputMode {
@@ -224,8 +240,8 @@ impl HeldInput {
 }
 
 fn main() -> io::Result<()> {
-    let requested_mode = match parse_input_mode(std::env::args()) {
-        Ok(mode) => mode,
+    let options = match parse_cli_options(std::env::args()) {
+        Ok(options) => options,
         Err(message) => {
             eprintln!("{message}");
             std::process::exit(2);
@@ -233,7 +249,7 @@ fn main() -> io::Result<()> {
     };
     // Auto queries support before Renderer makes stdout non-blocking. Explicit
     // modes bypass probing so users can override incomplete terminal support.
-    let mut effective_mode = resolve_input_mode(requested_mode);
+    let mut effective_mode = resolve_input_mode(options.input_mode);
     let mut renderer = Renderer::new()?;
     renderer.init()?;
     // Ask the terminal to report key press/release/repeat separately so we can
@@ -245,8 +261,9 @@ fn main() -> io::Result<()> {
     let mut rng = rng();
     let (w, h) = (renderer.width, renderer.height);
     let mut game = Game::new(w, h, &mut rng);
+    game.set_debug_enabled(options.debug);
     let mut score_store = ScoreStore::discover();
-    game.high_score = score_store.load();
+    game.apply_profile(score_store.load());
 
     // Horizontal (left/right) and vertical (up/down) are tracked independently
     // so two axes can be held at once (diagonal move).
@@ -323,13 +340,14 @@ fn main() -> io::Result<()> {
         if was_playing && game.state == GameState::GameOver {
             input.clear();
         }
-        let _ = score_store.save_if_higher(game.high_score);
+        let _ = score_store.save_if_changed(game.profile());
 
         // Render
         renderer.clear();
         game.render(&mut renderer);
         if game.state == GameState::Menu {
-            let status = format!("INPUT: {}", input.mode.label());
+            let debug_status = if game.debug_enabled { " | DEBUG" } else { "" };
+            let status = format!("INPUT: {}{debug_status}", input.mode.label());
             renderer.put_str(
                 1,
                 renderer.height.saturating_sub(1),
@@ -376,7 +394,7 @@ fn main() -> io::Result<()> {
     }
 
     game.finish_run();
-    let _ = score_store.save_if_higher(game.high_score);
+    let _ = score_store.save_if_changed(game.profile());
     renderer.disable_kitty();
     Ok(())
 }
@@ -433,9 +451,27 @@ fn handle_key(key: KeyEvent, game: &mut Game, input: &mut HeldInput) -> bool {
 
     match game.state {
         GameState::Menu => {
-            if key.code == KeyCode::Char(' ') {
-                game.start();
-                input.clear();
+            if key.kind == KeyEventKind::Press {
+                let selected = match key.code {
+                    KeyCode::Char('1') => Some(DifficultyPreset::Easy),
+                    KeyCode::Char('2') => Some(DifficultyPreset::Normal),
+                    KeyCode::Char('3') => Some(DifficultyPreset::Hard),
+                    KeyCode::Char('4') => Some(DifficultyPreset::Extreme),
+                    KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
+                        Some(game.difficulty_preset.previous())
+                    }
+                    KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
+                        Some(game.difficulty_preset.next())
+                    }
+                    _ => None,
+                };
+                if let Some(preset) = selected {
+                    game.select_difficulty(preset);
+                    input.clear_movement();
+                } else if key.code == KeyCode::Char(' ') {
+                    game.start();
+                    input.clear();
+                }
             }
         }
         GameState::Playing => match key.code {
@@ -545,29 +581,94 @@ mod tests {
     #[test]
     fn input_mode_defaults_to_auto() {
         assert_eq!(
-            parse_input_mode(args(&["skystrike"])),
-            Ok(RequestedInputMode::Auto)
+            parse_cli_options(args(&["skystrike"])),
+            Ok(CliOptions::default())
         );
     }
 
     #[test]
     fn input_mode_accepts_split_and_equals_forms() {
         assert_eq!(
-            parse_input_mode(args(&["skystrike", "--input", "enhanced"])),
-            Ok(RequestedInputMode::Enhanced)
+            parse_cli_options(args(&["skystrike", "--input", "enhanced"])),
+            Ok(CliOptions {
+                input_mode: RequestedInputMode::Enhanced,
+                debug: false,
+            })
         );
         assert_eq!(
-            parse_input_mode(args(&["skystrike", "--input=compatible"])),
-            Ok(RequestedInputMode::Compatible)
+            parse_cli_options(args(&["skystrike", "--input=compatible"])),
+            Ok(CliOptions {
+                input_mode: RequestedInputMode::Compatible,
+                debug: false,
+            })
+        );
+    }
+
+    #[test]
+    fn debug_flag_combines_with_input_mode_in_either_order() {
+        let expected = CliOptions {
+            input_mode: RequestedInputMode::Enhanced,
+            debug: true,
+        };
+        assert_eq!(
+            parse_cli_options(args(&["skystrike", "--debug", "--input", "enhanced"])),
+            Ok(expected)
+        );
+        assert_eq!(
+            parse_cli_options(args(&["skystrike", "--input=enhanced", "--debug"])),
+            Ok(expected)
         );
     }
 
     #[test]
     fn input_mode_rejects_invalid_values() {
-        let error = parse_input_mode(args(&["skystrike", "--input", "unknown"]))
+        let error = parse_cli_options(args(&["skystrike", "--input", "unknown"]))
             .expect_err("invalid modes must fail");
 
         assert!(error.contains(INPUT_USAGE));
+    }
+
+    #[test]
+    fn difficulty_is_not_a_command_line_option() {
+        let error = parse_cli_options(args(&["skystrike", "--difficulty", "hard"]))
+            .expect_err("difficulty must be selected in the game menu");
+
+        assert!(error.contains("unknown argument: --difficulty"));
+    }
+
+    #[test]
+    fn menu_selects_difficulty_on_press_and_ignores_repeat() {
+        let mut rng = rng();
+        let mut game = Game::new(80, 24, &mut rng);
+        let mut input = HeldInput::new(EffectiveInputMode::Enhanced);
+
+        handle_key(
+            KeyEvent::new_with_kind(KeyCode::Right, KeyModifiers::NONE, KeyEventKind::Press),
+            &mut game,
+            &mut input,
+        );
+        assert_eq!(game.difficulty_preset, DifficultyPreset::Hard);
+
+        handle_key(
+            KeyEvent::new_with_kind(KeyCode::Right, KeyModifiers::NONE, KeyEventKind::Repeat),
+            &mut game,
+            &mut input,
+        );
+        assert_eq!(game.difficulty_preset, DifficultyPreset::Hard);
+
+        handle_key(
+            KeyEvent::new_with_kind(KeyCode::Char('1'), KeyModifiers::NONE, KeyEventKind::Press),
+            &mut game,
+            &mut input,
+        );
+        assert_eq!(game.difficulty_preset, DifficultyPreset::Easy);
+
+        handle_key(
+            KeyEvent::new_with_kind(KeyCode::Char('4'), KeyModifiers::NONE, KeyEventKind::Press),
+            &mut game,
+            &mut input,
+        );
+        assert_eq!(game.difficulty_preset, DifficultyPreset::Extreme);
     }
 
     #[test]
@@ -745,7 +846,7 @@ mod tests {
         );
 
         assert!(matches!(game.state, GameState::Menu));
-        assert_eq!(game.high_score, game.score);
+        assert_eq!(game.current_high_score(), game.score);
         assert!(!input.auto_fire);
     }
 

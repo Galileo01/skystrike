@@ -10,13 +10,14 @@ SkyStrike 是一个用 Rust + crossterm 写的终端版《雷电》射击小游�
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/main.rs` | 程序入口、输入模式参数、主循环、键盘分发、kitty 协议与兼容兜底 |
+| `src/main.rs` | 程序入口、`--input` / `--debug` 参数、主循环、键盘分发、kitty 协议与兼容兜底 |
+| `src/difficulty.rs` | Easy / Normal / Hard / Extreme 预设、菜单循环顺序、分档最高分与本地 Profile 数据结构 |
 | `src/game.rs` | 状态机(`Menu`/`Playing`/`Paused`/`GameOver`)、难度曲线、AABB 碰撞 |
 | `src/player.rs` | 玩家飞机精灵、四向移动(水平/垂直两轴)判定 `Dir`、碰撞盒 |
-| `src/obstacle.rs` | 敌机(大/小)与对象池 `ObstaclePool` |
+| `src/obstacle.rs` | 敌机(大/小)、预分配奖励、`ObstacleUpdateContext` 与对象池 `ObstaclePool` |
 | `src/bullet.rs` | 子弹与对象池 `BulletPool`、共享发射冷却、散射弹道 |
 | `src/pickup.rs` | Scatter / Repair / EMP 拾取物与对象池 `PickupPool` |
-| `src/score_store.rs` | 最高分路径解析、容错读取与临时文件原子保存 |
+| `src/score_store.rs` | 难度设置、分档最高分、旧记录迁移与临时文件原子保存 |
 | `src/background.rs` | 两层视差星空 |
 | `src/renderer.rs` | 双缓冲终端渲染器、diff 刷新、RAII 清理 |
 
@@ -56,6 +57,7 @@ SkyStrike 是一个用 Rust + crossterm 写的终端版《雷电》射击小游�
 
 - **双缓冲 + diff 刷新**:保留 `last_buffer`,`flush()` 只重绘变化的单元格并最小化光标移动(`src/renderer.rs`)。这是 TUI 流畅度的关键。
 - **对象池**:`ObstaclePool` / `BulletPool` / `PickupPool` 复用非活跃槽位,避免每帧分配(`src/obstacle.rs`、`src/bullet.rs`、`src/pickup.rs`)。
+- **ASCII 精灵画布与碰撞盒必须一致**:敌机每一行都填充到固定奇数宽度,中轴字符位于 `width / 2`;生成边界与 AABB 同样读取该宽度。否则逐行前导空格不一致会让机身或尾部看起来歪斜,调试标签也会与视觉中心错位(`src/obstacle.rs`)。
 - 子弹/敌机使用冷却与对象池模式,控制数量上限。
 
 > TODO(后续):可补充 Benmark/ profiling 思路,或 `BufWriter` 批量写 stdout 的收益。
@@ -120,28 +122,44 @@ raw 模式下,普通键通常**不发送 key-up(松开)事件**。若用"按下�
 
 ## 8. 游戏机制深度(生命值 / 连击)
 
-- **生命值(`lives`)**:初始 3 条。玩家撞敌机不再秒死,而是扣 1 命、进入 `INVINCIBLE_TICKS`(120 tick ≈ 2s)无敌期并重置到出生点;命数为 0 才切 `GameOver`。无敌期用**帧计数**(`invincible_ticks`)而非 `dt` 倒计时,复用 Layer 1 的经验——避免再踩“时钟分辨率怪异导致计时归零”的坑(`src/game.rs`)。
+- **生命值(`lives`)**:初始 3 条。玩家撞敌机不再秒死,而是原地扣 1 命、移除碰撞敌机并进入 `INVINCIBLE_TICKS`(120 tick ≈ 2s)无敌期;命数为 0 才切 `GameOver`。无敌期用**帧计数**(`invincible_ticks`)而非 `dt` 倒计时,复用 Layer 1 的经验——避免再踩“时钟分辨率怪异导致计时归零”的坑(`src/game.rs`)。
 - **无敌闪烁**:`Game.render` 在无敌期的奇数 tick 跳过玩家渲染,产生闪烁效果,无需玩家结构感知 `invincible` 状态。
-- **连击(`combo`)**:`COMBO_WINDOW`(180 tick ≈ 3s)内连续击杀叠加倍数,击杀得分 `50 × combo`;窗口内无击杀则 `combo` 清零。同样用**帧计数**(`combo_timer`)实现窗口,而非墙钟时间。
-- HUD 在 `render_hud` 绘制:`SCORE`(白)、`LV`(黄)、生命 “♥”(红,第 1 行)、`COMBO xN`(品红,第 2 行,combo≥2 时)。
+- **类型分值与连击(`combo`)**:`ObstacleType::base_score` 集中定义小型敌机 50 分、大型敌机 100 分;`COMBO_WINDOW`(180 tick ≈ 3s)内连续击杀叠加倍数,最终击杀得分为 `base_score × combo`,窗口内无击杀则 `combo` 清零。同样用**帧计数**(`combo_timer`)实现窗口,而非墙钟时间。
+- **局部得分反馈**:击毁敌机后在其中心生成约 0.75 秒的 `ScorePopup`,直接展示应用连击后的实际得分。浮字随游戏暂停而冻结,新一局统一清空;EMP、撞机和越界不会创建浮字(`src/game.rs`)。
+- HUD 在 `render_hud` 绘制 `SCORE`(白)、`LV`(黄)、生命 “♥”(红)和武器/Scatter/EMP 状态;Scatter 最后 3 秒变红提示,连击后的实际收益由击毁位置的得分浮字直接反馈。
 - 设计取舍:计时类状态一律用帧计数,绝不用 `Instant` 之差——这是本项目踩过的最贵的一个坑(见 6.7)。
 
 ## 9. 拾取奖励与武器成长
 
-- 敌机被子弹击毁后有 20% 概率在敌机中心生成奖励。掉落成功后按权重选择 Scatter 55%、Repair 15%、EMP 30%,对应每次击杀约 11%/3%/6%。拾取物以 `0.45 × dt` 下落,越过底边或被玩家碰到后进入非活跃状态,后续掉落优先复用该槽位(`src/pickup.rs`)。
-- 玩家武器等级为 Lv1/Lv2/Lv3,对应每轮 1/3/5 发。达到 Lv3 后再次拾取不会继续扩张弹幕,而是奖励 500 分;奖励分进入现有难度计算,但不改变连击次数。
+- 每架敌机生成时就以 20% 概率预先确定 `carried_pickup`;成功后按权重选择 Scatter 55%、Repair 15%、EMP 30%,对应每架敌机约 11%/3%/6%。只有被玩家子弹击毁时才在敌机中心释放该奖励;撞机、越界与 EMP 清屏都会直接丢弃它。把抽签从“死亡时”提前到“生成时”,让调试模式能够观察携带物,但不改变正常模式的掉落概率与触发规则。拾取物以 `0.45 × dt` 下落,越过底边或被玩家碰到后进入非活跃状态,后续掉落优先复用该槽位(`src/obstacle.rs`、`src/pickup.rs`)。
+- 玩家武器等级为 Lv1/Lv2/Lv3,对应每轮 1/3/5 发。Scatter 成功升到 Lv2/Lv3 时把 `scatter_ticks` 设为 600 tick(约 10 秒);到期恢复 Lv1 并显示提示。达到 Lv3 后再次拾取不会刷新时间或继续扩张弹幕,而是奖励 500 分;奖励分进入现有难度计算,但不改变连击次数。
 - Repair 在生命少于 3 时恢复一条命,满生命时转换为 300 分。EMP 拾取瞬间把当前活跃敌机标记为非活跃(不计分、不增加 combo、不触发掉落),再把敌机生成间隔放大为 1.8 倍并持续 600 tick(约 10 秒);重复拾取刷新持续时间但不叠加倍率。
-- 每次拾取设置约 2 秒的 `PickupNotice`,在画面上方显示奖励类型与结果;EMP 生效期间 HUD 额外显示剩余秒数。暂停发生在计时更新前,所以提示和 EMP 都会冻结。
-- 撞机后不再传送到下方中央:玩家保留当前位置与武器等级,碰撞敌机立即回收,并获得约 2 秒无敌。当前玩法没有安全出生区或重生清屏,原地受伤能避免传送进另一架敌机造成连续扣命;`Game::start` 仍会创建新玩家,所以新一局恢复 Lv1。
+- 每次拾取设置约 2 秒的 `PickupNotice`,在画面上方显示奖励类型与结果;Scatter 与 EMP 生效期间 HUD 显示剩余秒数。暂停发生在计时更新前,所以提示和两个效果都会冻结;受伤不会立即清除 Scatter,但正常游玩时倒计时继续。
+- 撞机后不再传送到下方中央:玩家保留当前位置与 Scatter 剩余时间,碰撞敌机立即回收,并获得约 2 秒无敌。当前玩法没有安全出生区或重生清屏,原地受伤能避免传送进另一架敌机造成连续扣命;`Game::start` 仍会创建新玩家并清零 `scatter_ticks`,所以新一局恢复 Lv1。
 - 暂停在所有实体更新前返回,所以拾取物与子弹、敌机、星空一起冻结;Paused 仍渲染拾取物,恢复后从原位置继续。
 
-## 10. 最高分持久化
+## 10. 调试模式
 
-- `Game::finish_run` 在 GameOver、Esc 返回菜单和正常退出时把本局成绩合并到内存最高分;主循环只在该值超过已保存记录时调用 `ScoreStore::save_if_higher`,避免每帧写盘。
-- macOS 使用 `~/Library/Application Support/skystrike/high_score`,Linux 使用 `$XDG_DATA_HOME/skystrike/high_score`(或 `~/.local/share`),Windows 使用 `%LOCALAPPDATA%`;`SKYSTRIKE_DATA_DIR` 可覆盖目录。
-- 文件只保存一个十进制 `u32`。不存在、读失败或格式损坏都回退为 0;写入先落到 `high_score.tmp` 再 rename,避免半写内容替换有效记录(`src/score_store.rs`)。
+- 命令行解析集中到 `CliOptions`,所以 `--debug` 可以单独使用,也可以与 `--input auto|enhanced|compatible` 按任意顺序组合。菜单底部追加 `DEBUG`,避免忘记当前启动方式(`src/main.rs`)。
+- 调试模式在每架敌机上方显示预分配奖励:`[S]`、`[H]`、`[E]` 或无奖励 `[-]`;顶部额外显示难度倍率、活跃敌机/子弹/拾取物数量和当前生成间隔(`src/obstacle.rs`、`src/game.rs`)。
+- `debug_enabled` 只控制附加渲染,不参与随机抽取、碰撞或得分逻辑。普通模式也会在生成敌机时预分配奖励,因此开关调试模式不会形成两套玩法。可复现随机局面的 `--seed` 留给后续迭代。
 
-## 11. 构建与运行
+## 11. 菜单难度预设
+
+- `DifficultyPreset` 集中定义四档规则:Easy 的敌机生成间隔 ×1.25、速度 ×0.85;Normal 均为 ×1.0;Hard 为 ×0.8 / ×1.15;Extreme 为 ×0.65 / ×1.30。它们叠加在原有分数曲线上,不改变生命、奖励概率、敌机分值或连击窗口(`src/difficulty.rs`、`src/game.rs`)。
+- **密度倍率必须允许小于 1**:`ObstaclePool::set_spawn_interval_multiplier` 过去为 EMP 抑制而用 `max(1.0)`,接入 Hard/Extreme 后会把 0.8/0.65 悄悄抬回 1.0,造成“配置变密、运行未生效”。现在只保留 0.1 的安全下限,让高难缩短间隔、EMP 再乘 1.8 延长间隔(`src/obstacle.rs`)。
+- **只偏置 X,不改变顶部 Y**:敌机仍以 `y = -height` 创建并逐行进入。Easy 全随机;Normal/Hard/Extreme 分别以 10%/30%/50% 概率把敌机中心放到玩家当前中心 X 的 ±16/±12/±8 列内。候选位置会 clamp 到屏幕,若与仍在顶部区域的敌机及 3 列安全间距重叠,最多尝试 6 个普通随机位置回退(`src/difficulty.rs`、`src/obstacle.rs`)。
+- 终端尺寸、速度/难度倍率、玩家中心 X、预设与 `dt` 统一装入 `ObstacleUpdateContext`,避免 `ObstaclePool::update` 随生成策略扩展成难以维护的长参数列表。
+- 难度属于玩家玩法选择,因此不提供命令行参数。菜单用 `1/2/3/4` 直接选择,也支持 `A/D` 和左右方向键循环切换;只处理 `Press`,忽略增强协议的 `Repeat`,开始游戏时继续清空移动状态(`src/main.rs`)。
+- 首次运行或设置损坏时默认 Normal;切换后主循环把 `PlayerProfile` 写回本地,下次启动恢复上次档位。HUD 显示档位和等级,调试 HUD 额外显示档位、实际速度倍率与生成间隔。
+
+## 12. 设置与分档最高分持久化
+
+- `Game::finish_run` 在 GameOver、Esc 返回菜单和正常退出时只更新当前档位记录;四档分开比较,避免简单模式成绩覆盖高难模式。主循环通过 `ScoreStore::save_if_changed` 只在档位或成绩变化时写盘。
+- 同一应用数据目录下用 `settings` 保存 `difficulty=normal`,用 `high_scores` 保存 `easy/normal/hard/extreme` 四行记录。macOS 目录为 `~/Library/Application Support/skystrike`,Linux 为 `$XDG_DATA_HOME/skystrike`(或 `~/.local/share/skystrike`),Windows 为 `%LOCALAPPDATA%/skystrike`;`SKYSTRIKE_DATA_DIR` 仍可覆盖目录。
+- 若新 `high_scores` 不存在但旧 `high_score` 是有效整数,读取时把它迁移为 Normal 记录;其他档位从 0 开始。已有三行 `high_scores` 缺少 Extreme 时也安全回退为 0。缺失、不可读或损坏字段安全回退,写入仍采用临时文件 + rename(`src/score_store.rs`)。
+
+## 13. 构建与运行
 
 ```bash
 cargo build              # debug 构建
@@ -151,6 +169,7 @@ cargo run --release      # 运行(release)
 cargo run -- --input auto        # 自动探测(默认)
 cargo run -- --input enhanced    # 强制增强键盘协议
 cargo run -- --input compatible  # 强制传统终端兜底
+cargo run -- --debug             # 显示敌机奖励与实时调试 HUD
 cargo check              # 仅类型检查
 ```
 
@@ -162,6 +181,12 @@ cargo check              # 仅类型检查
 - 2026-07-10:Layer 2 启动——生命值/血条(3 命 + 无敌闪烁 + 重置出生点)、得分与连击倍数(3s 窗口,`50×combo`,HUD 显示 `COMBO xN`);新增第 8 节说明计时类状态一律用帧计数而非墙钟。
 ## 修订记录
 
+- 2026-07-24:Scatter 从整局永久升级改为 10 秒限时强化——成功升级刷新,满级拾取不续时,HUD 显示倒计时且最后 3 秒变红;暂停冻结、受伤保留,到期恢复 Lv1。
+- 2026-07-24:难度接入敌机生成密度与 X 轴航线偏置——Y 入场不变,高难按概率靠近玩家当前 X,顶部重叠时随机回退;修复 Hard/Extreme 小于 1 的间隔倍率被钳制失效。
+- 2026-07-23:新增仅菜单可选的 Easy/Normal/Hard/Extreme 难度预设,选择跨启动持久化;最高分改为按档保存,旧单数字记录迁移到 Normal,HUD/调试 HUD 与测试同步更新。
+- 2026-07-22:区分敌机击杀价值——小型 50 分、大型 100 分,再乘连击倍数;击毁位置短暂显示实际得分,补充类型计分、连击和浮字生命周期测试。
+- 2026-07-22:修正大、小敌机 ASCII 精灵的固定宽度与纵向中轴,使造型、奖励标签、生成边界和碰撞盒使用同一中心;增加精灵宽度/中轴回归测试。
+- 2026-07-21:新增 `--debug` 调试模式——敌机生成时预分配奖励并显示 `S/H/E/-`,HUD 展示难度、实体数量与生成间隔;调试开关只影响展示,不改变掉落规则。
 - 2026-07-20:撤销实验性 EMP 全屏闪光及其渲染器改造;终端全局背景色、清屏和非阻塞 diff 组合在不同终端上会产生残色与半帧,恢复稳定的逐格 diff 渲染,保留即时清敌与文字提示。
 - 2026-07-16:优化受伤与 EMP 反馈——撞机改为原地扣命并移除碰撞敌机,显示剩余生命;EMP 拾取时先无奖励清除当前敌机,再维持 10 秒生成抑制。
 - 2026-07-15:扩展拾取系统——新增 Repair/EMP 加权掉落、拾取结果提示、EMP 剩余时间 HUD 与生成间隔抑制;新增跨平台最高分容错加载和正常结束时原子保存。

@@ -7,7 +7,7 @@ const PICKUP_SPEED: f32 = 0.45;
 
 pub const PICKUP_DROP_CHANCE: f64 = 0.20;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PickupKind {
     Scatter,
     Repair,
@@ -15,7 +15,7 @@ pub enum PickupKind {
 }
 
 impl PickupKind {
-    fn symbol(self) -> &'static str {
+    pub fn symbol(self) -> &'static str {
         match self {
             Self::Scatter => "[S]",
             Self::Repair => "[H]",
@@ -30,6 +30,14 @@ impl PickupKind {
             Self::Emp => Color::Cyan,
         }
     }
+}
+
+/// Decide whether a newly spawned enemy carries a reward. Assignment happens
+/// at enemy creation in every mode, so debug rendering can observe the result
+/// without the debug flag changing random draws or drop rules.
+pub fn random_drop(rng: &mut impl Rng) -> Option<PickupKind> {
+    rng.random_bool(PICKUP_DROP_CHANCE)
+        .then(|| random_kind(rng))
 }
 
 /// Choose a reward after the separate 20% drop roll succeeds:
