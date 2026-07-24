@@ -1,8 +1,9 @@
 use crossterm::{
-    cursor, execute, queue,
+    cursor,
+    event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
+    execute, queue,
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags, PopKeyboardEnhancementFlags},
 };
 use std::io::{self, Write};
 use std::os::unix::io::AsRawFd;

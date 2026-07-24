@@ -4,6 +4,8 @@ A terminal-based tribute to the classic arcade shooter [**Raiden (雷电)**](htt
 
 ![screenshot](https://img.shields.io/badge/platform-terminal-black)
 ![Rust](https://img.shields.io/badge/rust-1.92+-orange)
+[![Crates.io](https://img.shields.io/crates/v/skystrike.svg)](https://crates.io/crates/skystrike)
+[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg)](https://crates.io/crates/skystrike)
 
 ## How to play
 
@@ -19,6 +21,22 @@ A terminal-based tribute to the classic arcade shooter [**Raiden (雷电)**](htt
 | Q / Ctrl+C | Quit |
 
 Dodge enemy planes and shoot them down with J. Your score increases every frame you survive; small fighters award 50 points and heavy bombers award 100, with a short score popup at the kill position. Chained kills within 3s multiply that enemy's base score. The menu offers Easy / Normal / Hard / Extreme presets; Normal preserves the original balance, while Easy slows enemy speed and spawning and the two higher modes progressively accelerate both. Higher modes also make some top-entry enemies choose an X position near the player's current lane, while preserving random offset and top-lane spacing. Destroyed enemies have a 20% chance to drop a reward: `[S]` Scatter upgrades the weapon through 1 / 3 / 5-shot volleys for 10 seconds, `[H]` Repair restores one life, and `[E]` EMP immediately clears active enemies before slowing new spawns for 10 seconds; an on-screen notice identifies each pickup. A successful Scatter upgrade refreshes its timer, while another pickup at Lv3 becomes 500 score without extending the effect. You have 3 lives — a hit keeps your position, removes the colliding enemy, costs one life, and grants ~2s of invincible blink. The selected difficulty and a separate high score for each preset persist in the local application-data directory.
+
+## Install
+
+SkyStrike 0.1 supports macOS and Linux and requires Rust 1.92 or newer.
+The renderer currently uses Unix terminal file-descriptor APIs, so Windows is
+not supported yet.
+
+```bash
+# From crates.io after the 0.1.0 release
+cargo install skystrike
+skystrike
+
+# Or install the current source checkout
+cargo install --path .
+skystrike
+```
 
 ## Build & Run
 
@@ -44,9 +62,10 @@ explicit mode to override detection for terminals with partial protocol support.
 `[-]`) and shows live difficulty, entity counts, and spawn interval in the HUD.
 It changes presentation only; normal play uses the same preassigned rewards.
 
-On macOS, settings and per-difficulty records default to
-`~/Library/Application Support/skystrike/{settings,high_scores}`. Set
-`SKYSTRIKE_DATA_DIR` to override the data directory. A legacy `high_score`
+Settings and per-difficulty records default to
+`~/Library/Application Support/skystrike/{settings,high_scores}` on macOS and
+`${XDG_DATA_HOME:-~/.local/share}/skystrike/{settings,high_scores}` on Linux.
+Set `SKYSTRIKE_DATA_DIR` to override the data directory. A legacy `high_score`
 integer is migrated to the Normal record.
 
 ## Technical overview
@@ -75,4 +94,4 @@ integer is migrated to the Normal record.
 
 ## License
 
-MIT
+[MIT](LICENSE)

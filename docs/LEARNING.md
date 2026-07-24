@@ -159,7 +159,12 @@ raw 模式下,普通键通常**不发送 key-up(松开)事件**。若用"按下�
 - 同一应用数据目录下用 `settings` 保存 `difficulty=normal`,用 `high_scores` 保存 `easy/normal/hard/extreme` 四行记录。macOS 目录为 `~/Library/Application Support/skystrike`,Linux 为 `$XDG_DATA_HOME/skystrike`(或 `~/.local/share/skystrike`),Windows 为 `%LOCALAPPDATA%/skystrike`;`SKYSTRIKE_DATA_DIR` 仍可覆盖目录。
 - 若新 `high_scores` 不存在但旧 `high_score` 是有效整数,读取时把它迁移为 Normal 记录;其他档位从 0 开始。已有三行 `high_scores` 缺少 Extreme 时也安全回退为 0。缺失、不可读或损坏字段安全回退,写入仍采用临时文件 + rename(`src/score_store.rs`)。
 
-## 13. 构建与运行
+## 13. 构建、打包与发布边界
+
+- `Cargo.toml` 用 `rust-version = "1.92"` 固定首版 MSRV,并补齐 crates.io 展示所需的 description、MIT license、repository、readme、keywords 与 categories。
+- 发布包采用 `include` 白名单,只包含编译所需源码、双语 README、LICENSE、CHANGELOG 和项目文档;`AGENTS.md`、`CLAUDE.md` 等协作文件不会进入 `.crate`。每次发布前用 `cargo package --list` 审核实际清单。
+- 当前 `renderer.rs` 使用 Unix 的 `AsRawFd`、`fcntl` 与 `O_NONBLOCK`,所以 `0.1.0` 明确支持 macOS/Linux,暂不承诺 Windows。GitHub Actions 在两个系统固定 Rust 1.92,执行格式、测试、release 构建、Clippy 与 package 验证。
+- crates.io 版本不可覆盖。流程必须是 package/dry-run → 从产物独立安装 → 用户确认 → release commit/tag → `cargo publish`;上传与 tag 不在普通功能迭代中自动执行。
 
 ```bash
 cargo build              # debug 构建
@@ -171,6 +176,8 @@ cargo run -- --input enhanced    # 强制增强键盘协议
 cargo run -- --input compatible  # 强制传统终端兜底
 cargo run -- --debug             # 显示敌机奖励与实时调试 HUD
 cargo check              # 仅类型检查
+cargo package --list     # 审核将进入 crates.io 的文件
+cargo publish --dry-run  # 只做发布演练,不上传
 ```
 
 ---
@@ -181,6 +188,7 @@ cargo check              # 仅类型检查
 - 2026-07-10:Layer 2 启动——生命值/血条(3 命 + 无敌闪烁 + 重置出生点)、得分与连击倍数(3s 窗口,`50×combo`,HUD 显示 `COMBO xN`);新增第 8 节说明计时类状态一律用帧计数而非墙钟。
 ## 修订记录
 
+- 2026-07-24:完成 `0.1.0` 发布准备演练——补齐 Cargo 元数据、MIT LICENSE、CHANGELOG、crates.io 徽章与 package 白名单,明确 macOS/Linux 边界并增加双平台 CI;dry-run 及从 `.crate` 独立安装验证通过。
 - 2026-07-24:Scatter 从整局永久升级改为 10 秒限时强化——成功升级刷新,满级拾取不续时,HUD 显示倒计时且最后 3 秒变红;暂停冻结、受伤保留,到期恢复 Lv1。
 - 2026-07-24:难度接入敌机生成密度与 X 轴航线偏置——Y 入场不变,高难按概率靠近玩家当前 X,顶部重叠时随机回退;修复 Hard/Extreme 小于 1 的间隔倍率被钳制失效。
 - 2026-07-23:新增仅菜单可选的 Easy/Normal/Hard/Extreme 难度预设,选择跨启动持久化;最高分改为按档保存,旧单数字记录迁移到 Normal,HUD/调试 HUD 与测试同步更新。

@@ -4,6 +4,8 @@
 
 ![平台](https://img.shields.io/badge/platform-terminal-black)
 ![Rust](https://img.shields.io/badge/rust-1.92+-orange)
+[![Crates.io](https://img.shields.io/crates/v/skystrike.svg)](https://crates.io/crates/skystrike)
+[![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg)](https://crates.io/crates/skystrike)
 
 ## 操作方式
 
@@ -19,6 +21,21 @@
 | Q / Ctrl+C | 退出 |
 
 躲避敌机并用 J 键开火击落它们。每存活一帧分数增加；击落小型敌机获得 50 分，击落大型敌机获得 100 分，并在击毁位置短暂显示本次得分。3 秒内连续击杀会用连击倍数乘以对应敌机的基础分。开始菜单提供简单 / 一般 / 困难 / 极难四档；一般保持原有平衡，简单降低敌机速度和生成频率，困难与极难则逐级提高两者。高难度下部分敌机仍从顶部进入，但生成 X 坐标会靠近玩家当前航线，同时保留随机偏移和顶部间距。敌机被击毁时有 20% 概率掉落奖励：`[S]` Scatter 在 10 秒内将武器升级为 1 / 3 / 5 发，`[H]` Repair 恢复一条生命，`[E]` EMP 立即清除当前敌机并在 10 秒内降低生成频率；拾取时画面会显示奖励说明。Scatter 成功升级时会刷新时间，Lv3 再拾取则转换为 500 分但不续时。你有 3 条命——被撞会原地扣 1 命、移除碰撞敌机并获得约 2 秒无敌闪烁。难度选择和每档独立最高分会保存到本机应用数据目录。
+
+## 安装
+
+SkyStrike 0.1 支持 macOS 与 Linux，需要 Rust 1.92 或更高版本。当前渲染器
+依赖 Unix 终端文件描述符接口，因此暂不支持 Windows。
+
+```bash
+# 0.1.0 发布到 crates.io 后
+cargo install skystrike
+skystrike
+
+# 或安装当前源码
+cargo install --path .
+skystrike
+```
 
 ## 构建与运行
 
@@ -43,9 +60,11 @@ Press/Repeat 推断的兼容移动。如果终端对协议的实现不完整，�
 `[-]`），并在 HUD 展示实时难度、实体数量和敌机生成间隔。它只增加调试信息，
 普通模式与调试模式使用相同的预分配奖励规则。
 
-macOS 的设置与分档最高分默认保存在
-`~/Library/Application Support/skystrike/{settings,high_scores}`。可以通过
-`SKYSTRIKE_DATA_DIR` 覆盖数据目录；旧版单数字 `high_score` 会迁移为一般难度记录。
+设置与分档最高分在 macOS 默认保存在
+`~/Library/Application Support/skystrike/{settings,high_scores}`，在 Linux
+默认保存在 `${XDG_DATA_HOME:-~/.local/share}/skystrike/{settings,high_scores}`。
+可以通过 `SKYSTRIKE_DATA_DIR` 覆盖数据目录；旧版单数字 `high_score`
+会迁移为一般难度记录。
 
 ## 技术概览
 
@@ -72,4 +91,4 @@ macOS 的设置与分档最高分默认保存在
 
 ## 许可证
 
-MIT
+[MIT](LICENSE)

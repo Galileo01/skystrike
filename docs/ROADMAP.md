@@ -41,17 +41,17 @@
 
 ## 发布与分发规划
 
-发布采用 **crates.io + GitHub Releases 双渠道**:crates.io 面向已有 Rust 工具链的用户,提供 `cargo install skystrike`;GitHub Releases 提供预编译二进制,降低普通玩家的安装门槛。当前不急于发布 `0.1.0`,先完成调试能力、平台边界和打包整理。
+发布采用 **crates.io + GitHub Releases 双渠道**:crates.io 面向已有 Rust 工具链的用户,提供 `cargo install skystrike`;GitHub Releases 提供预编译二进制,降低普通玩家的安装门槛。`0.1.0` 已进入发布准备,正式上传前仍需完成 dry-run、安装验证与用户确认。
 
 ### 发布前检查
 
 1. [x] **完成调试模式 MVP**:`--debug` + 敌机奖励标记 + 调试 HUD。
 2. [ ] **增加可复现随机局面**:支持 `--seed <数字>`,让调试结果能够稳定重放。
-3. [ ] **明确平台范围**:当前渲染器依赖 Unix `AsRawFd` / `fcntl`;第一版至少验证 macOS、Linux 并在 README 标注支持范围,Windows 要么增加 `cfg` 兼容实现,要么明确暂不支持。
-4. [ ] **增加发布 CI**:在 macOS、Linux 执行 `cargo test`、`cargo build --release`、`cargo clippy --all-targets -- -D warnings`;发布 job 再构建归档。
-5. [ ] **补齐 Cargo 元数据**:`description`、`license` / `license-file`、`repository`、`readme`、`keywords`、`categories`;确认 crate 名称仍可用并确定最低 Rust 版本策略。
-6. [ ] **精简 crate 内容**:使用 `include` / `exclude` 排除 `AGENTS.md`、`CLAUDE.md` 等开发协作文件;通过 `cargo package --list` 审核最终包内容。
-7. [ ] **发布前演练**:执行 `cargo publish --dry-run`,检查生成的 `.crate` 能独立编译;为 `0.1.0` 准备 changelog 和 Git tag。
+3. [x] **明确平台范围**:README 标注首版支持 macOS/Linux;渲染器依赖 Unix `AsRawFd` / `fcntl`,Windows 暂不支持。
+4. [x] **增加验证 CI**:macOS、Linux 固定 Rust 1.92,执行 fmt、test、release build、Clippy 与 `cargo package`。
+5. [x] **补齐 Cargo 元数据**:`description`、MIT `license`、`repository`、`readme`、`keywords`、`categories` 与 `rust-version = 1.92`。
+6. [x] **精简 crate 内容**:用 `include` 只发布源码、双语 README、LICENSE、CHANGELOG 和项目文档,排除 `AGENTS.md`、`CLAUDE.md`。
+7. [x] **发布前演练**:`cargo publish --dry-run` 通过;生成的 20 文件 `.crate` 可独立编译并安装运行,`CHANGELOG.md` 已准备。最终确认后再创建 Git tag。
 8. [ ] **发布 crates.io `0.1.0`**:验证 `cargo install skystrike` 后可直接启动游戏。
 9. [ ] **发布 GitHub Releases**:提供 macOS、Linux 预编译包、校验值和简短安装说明;Windows 支持完成后再增加对应产物。
 
@@ -118,6 +118,7 @@
 - Layer 2 开始(2026-07-10):生命值/血条(3 命 + 无敌闪烁 + 重置)、得分与连击倍数(3s 窗口,`50×combo`)。
 ## 进度记录
 
+- 2026-07-24:完成 `0.1.0` 发布演练——补齐 crate 元数据、MIT LICENSE、CHANGELOG 与 crates.io 徽章,明确 macOS/Linux 平台范围并增加双平台 CI;20 文件 package/dry-run/独立安装均通过。
 - 2026-07-24:Scatter 改为 10 秒限时强化——升级刷新时间,满级拾取只转 500 分且不续时,HUD 倒计时并在到期后恢复 Lv1;暂停冻结、受伤保留剩余时间。
 - 2026-07-24:难度开始影响敌机 X 轴生成——保持顶部 Y 入场,高难模式按概率偏向玩家当前航线并保留随机偏移/重叠回退;修复小于 1.0 的生成间隔倍率被错误钳制,Hard/Extreme 密度现已真实生效。
 - 2026-07-23:完成菜单难度选择并扩展 Extreme——Easy/Normal/Hard/Extreme 分别应用生成间隔与敌机速度倍率,选择写入本地 `settings`,最高分按档写入 `high_scores`,旧 `high_score` 迁移为 Normal。

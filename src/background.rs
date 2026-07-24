@@ -38,7 +38,11 @@ impl Background {
                 color: Color::White,
             });
         }
-        Self { stars, width, height }
+        Self {
+            stars,
+            width,
+            height,
+        }
     }
 
     pub fn update(&mut self, width: u16, height: u16, dt: f32, rng: &mut impl Rng) {
