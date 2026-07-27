@@ -7,6 +7,8 @@
 [![Crates.io](https://img.shields.io/crates/v/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 [![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 
+![SkyStrike 极难模式暂停时的战斗画面](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/gameplay.jpg)
+
 ## 操作方式
 
 | 按键 | 操作 |
@@ -21,6 +23,16 @@
 | Q / Ctrl+C | 退出 |
 
 躲避敌机并用 J 键开火击落它们。每存活一帧分数增加；击落小型敌机获得 50 分，击落大型敌机获得 100 分，并在击毁位置短暂显示本次得分。3 秒内连续击杀会用连击倍数乘以对应敌机的基础分。开始菜单提供简单 / 一般 / 困难 / 极难四档；一般保持原有平衡，简单降低敌机速度和生成频率，困难与极难则逐级提高两者。高难度下部分敌机仍从顶部进入，但生成 X 坐标会靠近玩家当前航线，同时保留随机偏移和顶部间距。敌机被击毁时有 20% 概率掉落奖励：`[S]` Scatter 在 10 秒内将武器升级为 1 / 3 / 5 发，`[H]` Repair 恢复一条生命，`[E]` EMP 立即清除当前敌机并在 10 秒内降低生成频率；拾取时画面会显示奖励说明。Scatter 成功升级时会刷新时间，Lv3 再拾取则转换为 500 分但不续时。你有 3 条命——被撞会原地扣 1 命、移除碰撞敌机并获得约 2 秒无敌闪烁。难度选择和每档独立最高分会保存到本机应用数据目录。
+
+## 游戏截图
+
+### 难度选择
+
+![SkyStrike 菜单中选择极难模式](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/menu.jpg)
+
+### 武器升级与自动开火
+
+![SkyStrike 战斗中的限时武器升级和自动开火](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/powerups.jpg)
 
 ## 安装
 

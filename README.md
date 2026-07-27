@@ -7,6 +7,8 @@ A terminal-based tribute to the classic arcade shooter [**Raiden (雷电)**](htt
 [![Crates.io](https://img.shields.io/crates/v/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 [![Crates.io Downloads](https://img.shields.io/crates/d/skystrike.svg?cacheSeconds=300)](https://crates.io/crates/skystrike)
 
+![SkyStrike gameplay paused during an Extreme difficulty run](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/gameplay.jpg)
+
 ## How to play
 
 | Key | Action |
@@ -21,6 +23,16 @@ A terminal-based tribute to the classic arcade shooter [**Raiden (雷电)**](htt
 | Q / Ctrl+C | Quit |
 
 Dodge enemy planes and shoot them down with J. Your score increases every frame you survive; small fighters award 50 points and heavy bombers award 100, with a short score popup at the kill position. Chained kills within 3s multiply that enemy's base score. The menu offers Easy / Normal / Hard / Extreme presets; Normal preserves the original balance, while Easy slows enemy speed and spawning and the two higher modes progressively accelerate both. Higher modes also make some top-entry enemies choose an X position near the player's current lane, while preserving random offset and top-lane spacing. Destroyed enemies have a 20% chance to drop a reward: `[S]` Scatter upgrades the weapon through 1 / 3 / 5-shot volleys for 10 seconds, `[H]` Repair restores one life, and `[E]` EMP immediately clears active enemies before slowing new spawns for 10 seconds; an on-screen notice identifies each pickup. A successful Scatter upgrade refreshes its timer, while another pickup at Lv3 becomes 500 score without extending the effect. You have 3 lives — a hit keeps your position, removes the colliding enemy, costs one life, and grants ~2s of invincible blink. The selected difficulty and a separate high score for each preset persist in the local application-data directory.
+
+## Screenshots
+
+### Difficulty selection
+
+![SkyStrike menu with Extreme difficulty selected](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/menu.jpg)
+
+### Weapon upgrades and auto-fire
+
+![SkyStrike combat with a timed weapon upgrade and auto-fire enabled](https://raw.githubusercontent.com/Galileo01/skystrike/main/docs/assets/powerups.jpg)
 
 ## Install
 
